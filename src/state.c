@@ -17,6 +17,7 @@ void ss_init(scene_state_t *ss) {
     ss_grid_init(ss);
     ss_rand_init(ss);
     ss_midi_init(ss);
+    ss_phz_init(ss);
     ss->delay.count = 0;
     for (size_t i = 0; i < NB_NBX_SCALES; i++) {
         ss->variables.n_scale_bits[i] = bit_reverse(0b101011010101, 12);
@@ -31,6 +32,12 @@ void ss_init(scene_state_t *ss) {
     ss->variables.time = 0;
     ss->variables.time_act = 1;
     ss->i2c_op_address = -1;
+}
+
+void ss_phz_init(scene_state_t *ss) {
+    memset(&ss->phz, 0, sizeof ss->phz);
+    ss->phz.address[0] = 69;
+    for (size_t i = 0; i < 4; ++i) ss->phz.channel[i] = 1;
 }
 
 void ss_variables_init(scene_state_t *ss) {

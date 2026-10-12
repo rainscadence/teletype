@@ -1,0 +1,71 @@
+["PHZ"]
+prototype = "PHZ"
+prototype_set = "PHZ n"
+short = "Get or select PHZ device n (1..4)"
+description = """
+Select a configured Phazerville destination. Device 1 defaults to address 0x45;
+devices 2–4 default disabled. Selection and addresses reset when a scene loads.
+"""
+
+["PHZ.ADDR"]
+prototype = "PHZ.ADDR"
+prototype_set = "PHZ.ADDR address"
+short = "Get or set the selected PHZ destination address; 0 disables it"
+
+["PHZ.ERR"]
+prototype = "PHZ.ERR"
+short = "Return the last PHZ request result (0 success/admitted, 1..10 error)"
+
+["PHZ.Q.IN"]
+prototype = "PHZ.Q.IN mapping value"
+short = "Write signed Teletype voltage value to Quadrants input mapping 1..32"
+
+["PHZ.Q.POS"]
+prototype = "PHZ.Q.POS mapping position"
+short = "Write normalized position 0..16384 to Quadrants input mapping 1..32"
+
+["PHZ.Q.OUT"]
+prototype = "PHZ.Q.OUT mapping"
+short = "Read signed Teletype voltage from Quadrants output mapping 1..32"
+
+["PHZ.Q.OK"]
+prototype = "PHZ.Q.OK"
+short = "Return validity cached by the last PHZ.Q.OUT read"
+
+["PHZ.QTZ.SCALE"]
+prototype = "PHZ.QTZ.SCALE slot scale"
+short = "Set scale ID for live quantizer slot 1..8"
+
+["PHZ.QTZ.ROOT"]
+prototype = "PHZ.QTZ.ROOT slot root"
+short = "Set root pitch class 0..11 for live quantizer slot 1..8"
+
+["PHZ.QTZ.OCT"]
+prototype = "PHZ.QTZ.OCT slot octave"
+short = "Set fixed octave -8..8 for live quantizer slot 1..8"
+
+["PHZ.QTZ.MASK"]
+prototype = "PHZ.QTZ.MASK slot mask"
+short = "Set nonzero 16-bit note mask for live quantizer slot 1..8"
+description = """
+Teletype values are signed 16-bit. Use the corresponding negative value or an
+X-number for masks with bit 15 set; for example `-1` represents `0xFFFF`.
+"""
+
+["PHZ.QTZ.RANGE"]
+prototype = "PHZ.QTZ.RANGE slot low high"
+short = "Set inclusive octave window -8..8 for live quantizer slot 1..8"
+
+["PHZ.QTZ.ROFF"]
+prototype = "PHZ.QTZ.ROFF slot"
+short = "Disable the octave window for live quantizer slot 1..8"
+
+["PHZ.QTZ.REPL"]
+prototype = "PHZ.QTZ.REPL slot scale root octave mask enabled low high"
+short = "Atomically replace every property of live quantizer slot 1..8"
+description = """
+`enabled` is 0 or 1. An enabled range uses ordered `low` and `high` values from
+-8 through 8. A disabled range must use the canonical values `enabled=0 low=1
+high=0`. The whole replacement is one ordered request; invalid input changes
+nothing.
+"""

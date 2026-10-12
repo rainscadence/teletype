@@ -61,6 +61,9 @@ TARGET = $(THIS).elf
 
 # List of C source files.
 CSRCS = \
+	../src/phz/compact.c ../src/phz/compact-sender.c \
+	../src/ops/phz.c \
+	../module/ii_checked.c \
 	../module/main.c					\
 	../module/edit_mode.c   				\
 	../module/flash.c					\

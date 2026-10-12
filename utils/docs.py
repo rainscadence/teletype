@@ -67,7 +67,8 @@ OPS_SECTIONS = [
     "wslashsynth",
     "disting",
     "matrixarchate",
-    "i2c2midi"
+    "i2c2midi",
+    "phz"
 ]
 
 

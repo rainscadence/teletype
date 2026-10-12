@@ -1,7 +1,7 @@
 .PHONY: clean test
 CFLAGS = -std=c99 -g -Wall -fno-common -DSIM -I../src -I../libavr32/src
 
-tests: main.o \
+tests: main.o phz_transport.o ../src/ops/phz.o ../src/phz/compact.o ../src/phz/compact-sender.o \
 	log.o \
 	match_token_tests.o op_mod_tests.o \
 	parser_tests.o process_tests.o \

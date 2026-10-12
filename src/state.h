@@ -271,9 +271,18 @@ typedef struct {
     cal_data_t cal;
     int8_t i2c_op_address;
     scene_midi_t midi;
+    // Runtime-only PHZ destinations; not part of the saved scene format.
+    struct {
+        uint8_t selected, address[4], channel[4], output_valid, scope_active;
+        uint16_t tag[4];
+        // Internal diagnostics translated by PHZ.ERR, not returned verbatim.
+        int16_t error, driver_error;
+        uint8_t remote_status, remote_known;
+    } phz;
 } scene_state_t;
 
 extern void ss_init(scene_state_t *ss);
+extern void ss_phz_init(scene_state_t *ss);
 extern void ss_variables_init(scene_state_t *ss);
 extern void ss_patterns_init(scene_state_t *ss);
 extern void ss_pattern_init(scene_state_t *ss, size_t pattern_no);

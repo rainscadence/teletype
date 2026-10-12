@@ -7,6 +7,7 @@
 #include "ops/op.h"
 #include "ops/op_enum.h"
 #include "helpers.h"
+#include "ops/phz.h"
 
 %%{
     machine match_token; # declare our ragel machine
@@ -1152,6 +1153,8 @@
 // matches a single token, out contains the token, return value indicates
 // success or failure
 bool match_token(const char *token, const size_t len, tele_data_t *out) {
+    if (len >= 3 && token[0] == 'P' && token[1] == 'H' && token[2] == 'Z')
+        return phz_match_token(token,len,out);
     // required ragel declarations
     int cs;                       // machine state
     int act;                      // used with '=>'

@@ -1,6 +1,5 @@
 #include "scanner.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -9,6 +8,15 @@
 #include "teletype.h"
 
 const size_t kMaxTokenLength = 32;
+
+// Diagnostics need only a bounded token copy, not formatted I/O (which pulls
+// the full printf implementation into the AVR32 firmware).
+static void token_error(char error_msg[TELE_ERROR_MSG_LENGTH],
+                        const char *token, size_t length) {
+    if (length >= TELE_ERROR_MSG_LENGTH) length = TELE_ERROR_MSG_LENGTH - 1;
+    memcpy(error_msg, token, length);
+    error_msg[length] = '\0';
+}
 
 %%{
     machine scanner; # declare our ragel machine
@@ -51,9 +59,14 @@ error_t scanner(const char *data, tele_command_t *out,
             // token matched
 
             // copy the matched token to buf
-            char buf[kMaxTokenLength];
+            char buf[kMaxTokenLength + 1];
             size_t len = te-ts;
-            if (len > kMaxTokenLength) len = kMaxTokenLength;
+            if (len > kMaxTokenLength) {
+                // Reject the whole token; a truncated prefix may be a valid OP
+                // or number. Only the diagnostic may be shortened.
+                token_error(error_msg, ts, len);
+                return E_LENGTH;
+            }
             memcpy(buf, ts, len);
             buf[len] = '\0';
 
@@ -70,7 +83,7 @@ error_t scanner(const char *data, tele_command_t *out,
             }
             else {
                 // can't match the token, fail
-                strcpy(error_msg, buf);
+                token_error(error_msg, buf, len);
                 return E_PARSE;
             }
         }

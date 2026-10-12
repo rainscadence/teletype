@@ -1,7 +1,6 @@
 #include "teletype.h"
 
 #include <stdint.h>  // types
-#include <stdio.h>   // printf
 #include <string.h>
 #include <unistd.h>  // ssize_t
 
@@ -14,6 +13,15 @@
 
 
 bool processing_delays = false;
+
+static void name_error(char error_msg[TELE_ERROR_MSG_LENGTH], const char *name) {
+    size_t i = 0;
+    while (i < TELE_ERROR_MSG_LENGTH - 1 && name[i]) {
+        error_msg[i] = name[i];
+        ++i;
+    }
+    error_msg[i] = '\0';
+}
 
 /////////////////////////////////////////////////////////////////
 // DELAY ////////////////////////////////////////////////////////
@@ -70,14 +78,14 @@ error_t validate(const tele_command_t *c,
 
             // if we're not a first_cmd we need to return something
             if (!first_cmd && !op->returns) {
-                strcpy(error_msg, op->name);
+                name_error(error_msg, op->name);
                 return E_NOT_LEFT;
             }
 
             stack_depth -= op->params;
 
             if (stack_depth < 0) {
-                strcpy(error_msg, op->name);
+                name_error(error_msg, op->name);
                 return E_NEED_PARAMS;
             }
 
@@ -102,7 +110,7 @@ error_t validate(const tele_command_t *c,
                 mod_error = E_EXTRA_PARAMS;
 
             if (mod_error != E_OK) {
-                strcpy(error_msg, tele_mods[word_value]->name);
+                name_error(error_msg, tele_mods[word_value]->name);
                 return mod_error;
             }
 

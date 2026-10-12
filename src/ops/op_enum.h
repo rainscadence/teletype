@@ -964,6 +964,20 @@ typedef enum {
     E_OP_MI_LE,
     E_OP_MI_CLKD,
     E_OP_MI_CLKR,
+    E_OP_PHZ,
+    E_OP_PHZ_ADDR,
+    E_OP_PHZ_Q_IN,
+    E_OP_PHZ_Q_POS,
+    E_OP_PHZ_Q_OUT,
+    E_OP_PHZ_Q_OK,
+    E_OP_PHZ_ERR,
+    E_OP_PHZ_QTZ_SCALE,
+    E_OP_PHZ_QTZ_ROOT,
+    E_OP_PHZ_QTZ_OCT,
+    E_OP_PHZ_QTZ_MASK,
+    E_OP_PHZ_QTZ_RANGE,
+    E_OP_PHZ_QTZ_ROFF,
+    E_OP_PHZ_QTZ_REPL,
     E_OP__LENGTH,
 } tele_op_idx_t;
 
@@ -1000,6 +1014,10 @@ typedef enum {
     E_MOD_CROW2,
     E_MOD_CROW3,
     E_MOD_CROW4,
+    E_MOD_PHZ1,
+    E_MOD_PHZ2,
+    E_MOD_PHZ3,
+    E_MOD_PHZ4,
     E_MOD__LENGTH,
 } tele_mod_idx_t;
 

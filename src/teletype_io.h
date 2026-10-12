@@ -42,6 +42,12 @@ extern void tele_has_stack(bool has_stack);
 extern void tele_cv_off(uint8_t i, int16_t v);
 extern void tele_ii_tx(uint8_t addr, uint8_t *data, uint8_t l);
 extern void tele_ii_rx(uint8_t addr, uint8_t *data, uint8_t l);
+// PHZ-only checked path: 0 means full driver transfer; negative means failure.
+// 1..16 bytes, address 0x08..0x77. No retries. Driver errors latch until reboot.
+// RX output is unchanged on failure. Foreground, non-reentrant calls only.
+// These do not establish application success or recover the shared I2C bus.
+extern int tele_ii_tx_checked(uint8_t addr, const uint8_t *data, uint8_t l);
+extern int tele_ii_rx_checked(uint8_t addr, uint8_t *data, uint8_t l);
 extern void tele_scene(uint8_t i, uint8_t init_grid, uint8_t init_pattern);
 
 // called when a pattern is updated

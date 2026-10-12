@@ -127,6 +127,13 @@ void tele_ii_rx(uint8_t addr, uint8_t *data, uint8_t l) {
     printf("\n");
 }
 
+// No PHZ hardware in the simulator: fail explicitly, never fabricate success.
+int tele_ii_tx_checked(uint8_t addr, const uint8_t *data, uint8_t l) {
+    printf("PHZ transport unavailable in simulator\n");
+    return -3;
+}
+int tele_ii_rx_checked(uint8_t addr, uint8_t *data, uint8_t l) { return -3; }
+
 void tele_scene(uint8_t i, uint8_t init_grid, uint8_t init_pattern) {
     printf("SCENE  i:%" PRIu8, i);
     printf("\n");

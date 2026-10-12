@@ -115,6 +115,7 @@ void flash_read(uint8_t preset_no, scene_state_t *scene,
 
     if (init_i2c_op_address) scene->i2c_op_address = -1;
     ss_midi_init(scene);
+    ss_phz_init(scene);
 }
 
 uint8_t flash_last_saved_scene() {

@@ -37,7 +37,26 @@ TEST match_token_should_return_mod() {
     PASS();
 }
 
+TEST phz_tokens_require_exact_matches() {
+    const char *bad[] = {"PH", "PHZ.", "PHZ0", "PHZ5", "PHZ10", "PHZ1X",
+        "PHZ.Q", "PHZ.Q.I", "PHZ.Q.INX", "PHZ.Q.IN PHZ", "PHZPHZ", "phz",
+        "PHZ.QTZ", "PHZ.QTZ.", "PHZ.QTZ.CAP", "PHZ.QTZ.REPLACE",
+        "PHZ.QTZ.SCALEX"};
+    tele_data_t data;
+    for (size_t i=0; i<sizeof(bad)/sizeof(bad[0]); ++i)
+        ASSERT_FALSEm(bad[i], match_token(bad[i],strlen(bad[i]),&data));
+    const char bounded[] = {'P','H','Z','1','X'};
+    ASSERT(match_token(bounded,4,&data));
+    ASSERT_EQ(data.tag,MOD);
+    ASSERT_EQ(data.value,E_MOD_PHZ1);
+    ASSERT_FALSE(match_token(bounded,5,&data));
+    const char nul[] = {'P','H','Z',0,'X'};
+    ASSERT_FALSE(match_token(nul,sizeof nul,&data));
+    PASS();
+}
+
 SUITE(match_token_suite) {
     RUN_TEST(match_token_should_return_op);
     RUN_TEST(match_token_should_return_mod);
+    RUN_TEST(phz_tokens_require_exact_matches);
 }

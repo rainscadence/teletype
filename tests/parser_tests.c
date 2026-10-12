@@ -231,10 +231,114 @@ TEST print_command_corpus_should_be_unchanged() {
     PASS();
 }
 
+TEST parser_bounds_unknown_token_diagnostics() {
+    const size_t lengths[] = { 2, 14, 15, 16, 20, 31, 32, 33, 128 };
+    for (size_t i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+        char text[129];
+        memset(text, 'J', lengths[i]);
+        text[lengths[i]] = 0;
+        struct {
+            char message[TELE_ERROR_MSG_LENGTH];
+            char guard[16];
+        } diagnostic;
+        memset(&diagnostic, '!', sizeof(diagnostic));
+        tele_command_t command;
+        error_t result = parse(text, &command, diagnostic.message);
+        ASSERT_EQ(result, lengths[i] > 32 ? E_LENGTH : E_PARSE);
+        ASSERT_EQ(command.length, 0);
+        const size_t copied = lengths[i] < TELE_ERROR_MSG_LENGTH
+                                  ? lengths[i] : TELE_ERROR_MSG_LENGTH - 1;
+        ASSERT_EQ(diagnostic.message[copied], 0);
+        ASSERT_EQ(strlen(diagnostic.message), copied);
+        ASSERT_EQ(strncmp(diagnostic.message, text,
+                          copied), 0);
+        for (size_t j = 0; j < sizeof(diagnostic.guard); j++)
+            ASSERT_EQ(diagnostic.guard[j], '!');
+    }
+    PASS();
+}
+
+TEST validator_bounds_long_names() {
+    const size_t lengths[] = { 15, 16, 20, 31, 32 };
+    for (size_t i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+        char name[33];
+        memset(name, 'J', lengths[i]);
+        name[lengths[i]] = 0;
+        const tele_op_t op = { .name = name, .params = 1, .returns = false };
+        const tele_mod_t mod = { .name = name, .params = 0 };
+        for (int path = 0; path < 3; path++) {
+            struct {
+                char message[TELE_ERROR_MSG_LENGTH];
+                char guard[32];
+            } diagnostic;
+            memset(&diagnostic, '!', sizeof(diagnostic));
+            tele_command_t command = { .length = 1, .separator = -1 };
+            command.data[0].tag = path == 2 ? MOD : OP;
+            if (path == 1) {
+                command.length = 2;
+                command.data[0].tag = NUMBER;
+                command.data[1].tag = OP;
+            }
+            const tele_op_t* saved_op = tele_ops[0];
+            const tele_mod_t* saved_mod = tele_mods[0];
+            tele_ops[0] = &op;
+            tele_mods[0] = &mod;
+            error_t result = validate(&command, diagnostic.message);
+            // Restore the real tables even if a later assertion fails.
+            tele_ops[0] = saved_op;
+            tele_mods[0] = saved_mod;
+            ASSERT_EQ(result, path == 0 ? E_NEED_PARAMS :
+                              path == 1 ? E_NOT_LEFT : E_NEED_PRE_SEP);
+            ASSERT_EQ(diagnostic.message[TELE_ERROR_MSG_LENGTH - 1], 0);
+            ASSERT_EQ(strncmp(diagnostic.message, name,
+                              TELE_ERROR_MSG_LENGTH - 1), 0);
+            for (size_t j = 0; j < sizeof(diagnostic.guard); j++)
+                ASSERT_EQ(diagnostic.guard[j], '!');
+        }
+    }
+    PASS();
+}
+
+TEST parser_rejects_overlong_numeric_token() {
+    // A truncated prefix is a valid number: it must not be accepted as the input.
+    char text[34];
+    memset(text, '0', 33);
+    text[32] = '1';
+    text[33] = 0;
+    char error_msg[TELE_ERROR_MSG_LENGTH];
+    tele_command_t command;
+    ASSERT_EQ(parse(text, &command, error_msg), E_LENGTH);
+    ASSERT_EQ(command.length, 0);
+    // At the supported limit the final character must still be parsed.
+    text[31] = '1';
+    text[32] = 0;
+    ASSERT_EQ(parse(text, &command, error_msg), E_OK);
+    ASSERT_EQ(command.length, 1);
+    ASSERT_EQ(command.data[0].value, 1);
+    PASS();
+}
+
+TEST parser_preserves_token_and_modifier_limits() {
+    char error_msg[TELE_ERROR_MSG_LENGTH];
+    tele_command_t command;
+    ASSERT_EQ(parse("1 1 1 1 1 1 1 1 1 1 1 1 1 1 1", &command, error_msg), E_OK);
+    ASSERT_EQ(command.length, COMMAND_MAX_LENGTH - 1);
+    ASSERT_EQ(parse("1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1", &command, error_msg),
+              E_LENGTH);
+    ASSERT_EQ(parse("EX1: JJJJJJJJJJJJJJJJJJJJ", &command, error_msg), E_PARSE);
+    ASSERT_EQ(strlen(error_msg), TELE_ERROR_MSG_LENGTH - 1);
+    ASSERT_EQ(parse_and_validate_helper("EX1: EX.ALG"), E_OK);
+    PASS();
+}
+
 SUITE(parser_suite) {
     RUN_TEST(should_parse_and_validate);
     RUN_TEST(parser_test_sub_commands);
     RUN_TEST(parser_should_return_op);
     RUN_TEST(parser_should_return_mod);
     RUN_TEST(print_command_corpus_should_be_unchanged);
+    RUN_TEST(parser_bounds_unknown_token_diagnostics);
+    RUN_TEST(validator_bounds_long_names);
+    RUN_TEST(parser_rejects_overlong_numeric_token);
+    RUN_TEST(parser_preserves_token_and_modifier_limits);
 }
