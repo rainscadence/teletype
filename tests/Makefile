@@ -47,6 +47,7 @@ clean:
 	rm -rf tests.dSYM
 	rm -f *.o
 	rm -f ../src/*.o
+	rm -f ../src/phz/*.o
 	rm -f ../src/ops/*.o
 	rm -f ../libavr32/src/euclidean/*.o
 	rm -f ../libavr32/src/*.o

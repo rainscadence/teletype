@@ -3,43 +3,44 @@
 #include "teletype.h"
 #include "phz/compact-sender.h"
 #include <string.h>
+#if defined(__AVR32__)
+#define PHZ_NOINLINE __attribute__((noinline))
+#define PHZ_NO_JUMPS __attribute__((optimize("no-jump-tables")))
+#else
+#define PHZ_NOINLINE
+#define PHZ_NO_JUMPS
+#endif
 
-// Reuse registered names instead of expanding the large generated lexer.
-// Explicit IDs keep recognition independent of enum ordering or later additions.
+// Reuse the contiguous PHZ registration ranges instead of expanding the large
+// generated lexer.
 bool phz_match_token(const char *token, size_t length, tele_data_t *out) {
-    static const uint16_t ops[] = {E_OP_PHZ, E_OP_PHZ_ADDR, E_OP_PHZ_ERR,
-        E_OP_PHZ_Q_IN, E_OP_PHZ_Q_POS, E_OP_PHZ_Q_OUT, E_OP_PHZ_Q_OK,
-        E_OP_PHZ_QTZ_SCALE, E_OP_PHZ_QTZ_ROOT, E_OP_PHZ_QTZ_OCT,
-        E_OP_PHZ_QTZ_MASK, E_OP_PHZ_QTZ_RANGE, E_OP_PHZ_QTZ_ROFF,
-        E_OP_PHZ_QTZ_REPL};
-    static const uint16_t mods[] = {E_MOD_PHZ1,E_MOD_PHZ2,E_MOD_PHZ3,E_MOD_PHZ4};
-    for (size_t i=0; i<sizeof ops/sizeof ops[0]; ++i) {
-        const char *name=tele_ops[ops[i]]->name;
+    for (uint16_t i=E_OP_PHZ; i<=E_OP_PHZ_QTZ_REPL; ++i) {
+        const char *name=tele_ops[i]->name;
         if (strlen(name)==length && !memcmp(token,name,length)) {
-            out->tag=OP; out->value=ops[i]; return true;
+            out->tag=OP; out->value=i; return true;
         }
     }
-    for (size_t i=0; i<sizeof mods/sizeof mods[0]; ++i) {
-        const char *name=tele_mods[mods[i]]->name;
+    for (uint16_t i=E_MOD_PHZ1; i<=E_MOD_PHZ4; ++i) {
+        const char *name=tele_mods[i]->name;
         if (strlen(name)==length && !memcmp(token,name,length)) {
-            out->tag=MOD; out->value=mods[i]; return true;
+            out->tag=MOD; out->value=i; return true;
         }
     }
     return false;
 }
 
-static uint16_t next_tag(scene_state_t *ss) {
+static PHZ_NOINLINE uint16_t next_tag(scene_state_t *ss) {
     uint16_t *tag=&ss->phz.tag[ss->phz.selected];
     *tag= *tag==UINT16_MAX ? 1 : (uint16_t)(*tag+1);
     return *tag;
 }
-static void record(scene_state_t *ss, pcs_result r) {
+static PHZ_NOINLINE void record(scene_state_t *ss, pcs_result r) {
     ss->phz.error=(int16_t)r.error;
     ss->phz.driver_error=(int16_t)r.driver_error;
     ss->phz.remote_status=r.remote_status;
     ss->phz.remote_known=r.remote_known;
 }
-static void argument_error(scene_state_t *ss) {
+static PHZ_NOINLINE void argument_error(scene_state_t *ss) {
     pcs_result r={0}; r.error=PCS_ARGUMENT; record(ss,r);
 }
 static void clear_error(scene_state_t *ss) {
@@ -47,32 +48,20 @@ static void clear_error(scene_state_t *ss) {
 }
 static void error_get(const void *NOTUSED(data), scene_state_t *ss,
                       exec_state_t *NOTUSED(es), command_state_t *cs) {
-    int16_t error=PHZ_ERR_PROTOCOL;
-    switch (ss->phz.error) {
-    case PCS_OK: error=PHZ_ERR_NONE; break;
-    case PCS_ARGUMENT: error=PHZ_ERR_ARGUMENT; break;
-    case PCS_DISABLED: error=PHZ_ERR_DISABLED; break;
-    case PCS_TX: error=PHZ_ERR_SEND; break;
-    case PCS_RX: error=PHZ_ERR_RECEIVE; break;
-    case PCS_PROTOCOL: break;
-    case PCS_UNAVAILABLE: error=PHZ_ERR_UNAVAILABLE; break;
-    case PCS_REMOTE:
-        if (!ss->phz.remote_known) break;
-        switch (ss->phz.remote_status) {
-        case PC_ARGUMENT: error=PHZ_ERR_ARGUMENT; break;
-        case PC_WRONG_APP: error=PHZ_ERR_WRONG_APP; break;
-        case PC_UNAVAILABLE: error=PHZ_ERR_UNAVAILABLE; break;
-        case PC_BUSY: error=PHZ_ERR_BUSY; break;
-        case PC_FULL: error=PHZ_ERR_QUEUE_FULL; break;
-        case PC_UNSUPPORTED: error=PHZ_ERR_UNSUPPORTED; break;
-        default: break;
-        }
-        break;
+    int16_t error=ss->phz.error;
+    if (error==PCS_REMOTE) {
+        uint8_t status=ss->phz.remote_status;
+        error=PHZ_ERR_PROTOCOL;
+        if (ss->phz.remote_known && status>=PC_ARGUMENT &&
+            status<=PC_UNSUPPORTED)
+            error=status==PC_ARGUMENT ? PHZ_ERR_ARGUMENT : status+3;
     }
     // Non-destructive and bus-free; selector restoration preserves the error.
     cs_push(cs,error);
 }
-static void signal_write(uint8_t op, scene_state_t *ss, command_state_t *cs) {
+static void signal_write(const void *data, scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    uint8_t op=(uint8_t)(uintptr_t)data;
     int16_t mapping=cs_pop(cs), value=cs_pop(cs);
     if (mapping<1 || mapping>32 || (op==2 && (value<0 || value>16384))) {
         argument_error(ss); return;
@@ -80,95 +69,61 @@ static void signal_write(uint8_t op, scene_state_t *ss, command_state_t *cs) {
     pc_request r={1,op,(uint8_t)mapping,next_tag(ss),(uint16_t)value};
     record(ss,pcs_command(ss->phz.address[ss->phz.selected],&r));
 }
-static void input(const void *NOTUSED(data), scene_state_t *ss,
-                  exec_state_t *NOTUSED(es), command_state_t *cs) {
-    signal_write(1,ss,cs);
-}
-static void position(const void *NOTUSED(data), scene_state_t *ss,
-                     exec_state_t *NOTUSED(es), command_state_t *cs) {
-    signal_write(2,ss,cs);
-}
 static void quantizer_send(scene_state_t *ss, pc_qtz_request *request) {
     request->tag=next_tag(ss);
     record(ss,pcs_quantizer_command(ss->phz.address[ss->phz.selected],request));
 }
-static void quantizer_property(uint8_t op, scene_state_t *ss,
-                               command_state_t *cs) {
-    int16_t slot=cs_pop(cs), value=cs_pop(cs);
-    pc_qtz_request request={0};
+static PHZ_NO_JUMPS void quantizer(const void *data, scene_state_t *ss,
+                                   exec_state_t *NOTUSED(es),
+                                   command_state_t *cs) {
+    uint8_t op=(uint8_t)(uintptr_t)data;
+    int16_t slot=cs_pop(cs), value[7];
+    uint8_t count=op<=PC_QTZ_MASK ? 1 : op==PC_QTZ_RANGE ? 2 :
+                  op==PC_QTZ_REPLACE ? 7 : 0;
+    pc_qtz_request request;
+    for (uint8_t i=0; i<count; ++i) value[i]=cs_pop(cs);
     request.op=op;
     if (slot<1 || slot>8) { argument_error(ss); return; }
     request.slot=(uint8_t)slot;
     switch (op) {
     case PC_QTZ_SCALE:
-        if (value<0) { argument_error(ss); return; }
-        request.scale=(uint16_t)value; break;
+        if (value[0]<0) { argument_error(ss); return; }
+        request.scale=(uint16_t)value[0]; break;
     case PC_QTZ_ROOT:
-        if (value<0 || value>11) { argument_error(ss); return; }
-        request.root=(uint8_t)value; break;
+        if (value[0]<0 || value[0]>11) { argument_error(ss); return; }
+        request.root=(uint8_t)value[0]; break;
     case PC_QTZ_OCTAVE:
-        if (value<-8 || value>8) { argument_error(ss); return; }
-        request.octave=(int8_t)value; break;
+        if (value[0]<-8 || value[0]>8) { argument_error(ss); return; }
+        request.octave=(int8_t)value[0]; break;
     case PC_QTZ_MASK:
-        if (!value) { argument_error(ss); return; }
-        request.mask=(uint16_t)value; break;
+        if (!value[0]) { argument_error(ss); return; }
+        request.mask=(uint16_t)value[0]; break;
+    case PC_QTZ_RANGE: {
+        int16_t low=value[0], high=value[1];
+        if (low<-8 || low>8 || high<-8 || high>8 || low>high) {
+            argument_error(ss); return;
+        }
+        request.low=(int8_t)low; request.high=(int8_t)high; break;
+    }
+    case PC_QTZ_RANGE_OFF:
+        request.low=1; request.high=0; break;
+    case PC_QTZ_REPLACE: {
+        int16_t scale=value[0], root=value[1], octave=value[2];
+        int16_t mask=value[3], enabled=value[4], low=value[5];
+        int16_t high=value[6];
+        if (scale<0 || root<0 || root>11 || octave<-8 || octave>8 ||
+            !mask || enabled<0 || enabled>1 ||
+            (enabled ? (low<-8 || low>8 || high<-8 || high>8 || low>high)
+                     : (low!=1 || high!=0))) {
+            argument_error(ss); return;
+        }
+        request.scale=(uint16_t)scale; request.root=(uint8_t)root;
+        request.octave=(int8_t)octave; request.mask=(uint16_t)mask;
+        request.range_enabled=(uint8_t)enabled;
+        request.low=(int8_t)low; request.high=(int8_t)high; break;
+    }
     default: argument_error(ss); return;
     }
-    quantizer_send(ss,&request);
-}
-static void quantizer_scale(const void *NOTUSED(data), scene_state_t *ss,
-                            exec_state_t *NOTUSED(es), command_state_t *cs) {
-    quantizer_property(PC_QTZ_SCALE,ss,cs);
-}
-static void quantizer_root(const void *NOTUSED(data), scene_state_t *ss,
-                           exec_state_t *NOTUSED(es), command_state_t *cs) {
-    quantizer_property(PC_QTZ_ROOT,ss,cs);
-}
-static void quantizer_octave(const void *NOTUSED(data), scene_state_t *ss,
-                             exec_state_t *NOTUSED(es), command_state_t *cs) {
-    quantizer_property(PC_QTZ_OCTAVE,ss,cs);
-}
-static void quantizer_mask(const void *NOTUSED(data), scene_state_t *ss,
-                           exec_state_t *NOTUSED(es), command_state_t *cs) {
-    quantizer_property(PC_QTZ_MASK,ss,cs);
-}
-static void quantizer_range(const void *NOTUSED(data), scene_state_t *ss,
-                            exec_state_t *NOTUSED(es), command_state_t *cs) {
-    int16_t slot=cs_pop(cs), low=cs_pop(cs), high=cs_pop(cs);
-    if (slot<1 || slot>8 || low<-8 || low>8 || high<-8 || high>8 || low>high) {
-        argument_error(ss); return;
-    }
-    pc_qtz_request request={0};
-    request.op=PC_QTZ_RANGE; request.slot=(uint8_t)slot;
-    request.low=(int8_t)low; request.high=(int8_t)high;
-    quantizer_send(ss,&request);
-}
-static void quantizer_range_off(const void *NOTUSED(data), scene_state_t *ss,
-                                exec_state_t *NOTUSED(es), command_state_t *cs) {
-    int16_t slot=cs_pop(cs);
-    if (slot<1 || slot>8) { argument_error(ss); return; }
-    pc_qtz_request request={0};
-    request.op=PC_QTZ_RANGE_OFF; request.slot=(uint8_t)slot;
-    request.low=1; request.high=0;
-    quantizer_send(ss,&request);
-}
-static void quantizer_replace(const void *NOTUSED(data), scene_state_t *ss,
-                              exec_state_t *NOTUSED(es), command_state_t *cs) {
-    int16_t slot=cs_pop(cs), scale=cs_pop(cs), root=cs_pop(cs);
-    int16_t octave=cs_pop(cs), mask=cs_pop(cs), enabled=cs_pop(cs);
-    int16_t low=cs_pop(cs), high=cs_pop(cs);
-    if (slot<1 || slot>8 || scale<0 || root<0 || root>11 ||
-        octave<-8 || octave>8 || !mask || enabled<0 || enabled>1 ||
-        (enabled ? (low<-8 || low>8 || high<-8 || high>8 || low>high)
-                 : (low!=1 || high!=0))) {
-        argument_error(ss); return;
-    }
-    pc_qtz_request request={0};
-    request.op=PC_QTZ_REPLACE; request.slot=(uint8_t)slot;
-    request.scale=(uint16_t)scale; request.root=(uint8_t)root;
-    request.octave=(int8_t)octave; request.mask=(uint16_t)mask;
-    request.range_enabled=(uint8_t)enabled;
-    request.low=(int8_t)low; request.high=(int8_t)high;
     quantizer_send(ss,&request);
 }
 static void output(const void *NOTUSED(data), scene_state_t *ss,
@@ -187,28 +142,21 @@ static void output_ok(const void *NOTUSED(data), scene_state_t *ss,
     cs_push(cs,ss->phz.output_valid);
 }
 
-static void select_get(const void *NOTUSED(data), scene_state_t *ss,
-                       exec_state_t *NOTUSED(es), command_state_t *cs) {
-    cs_push(cs, ss->phz.selected + 1);
-}
-static void select_set(const void *NOTUSED(data), scene_state_t *ss,
-                       exec_state_t *NOTUSED(es), command_state_t *cs) {
-    int16_t slot=cs_pop(cs);
-    if (slot < 1 || slot > 4) { argument_error(ss); return; }
-    ss->phz.output_valid=0;
-    ss->phz.selected=(uint8_t)(slot-1);
-    clear_error(ss);
-}
-static void address_get(const void *NOTUSED(data), scene_state_t *ss,
+static void setting_get(const void *data, scene_state_t *ss,
                         exec_state_t *NOTUSED(es), command_state_t *cs) {
-    cs_push(cs, ss->phz.address[ss->phz.selected]);
+    cs_push(cs,(uintptr_t)data ? ss->phz.address[ss->phz.selected]
+                              : ss->phz.selected+1);
 }
-static void address_set(const void *NOTUSED(data), scene_state_t *ss,
+static void setting_set(const void *data, scene_state_t *ss,
                         exec_state_t *NOTUSED(es), command_state_t *cs) {
-    int16_t address=cs_pop(cs);
-    if (address != 0 && (address < 8 || address > 0x77)) { argument_error(ss); return; }
+    int16_t value=cs_pop(cs);
+    if ((uintptr_t)data ? (value!=0 && (value<8 || value>0x77))
+                        : (value<1 || value>4)) {
+        argument_error(ss); return;
+    }
     ss->phz.output_valid=0;
-    ss->phz.address[ss->phz.selected]=(uint8_t)address;
+    if ((uintptr_t)data) ss->phz.address[ss->phz.selected]=(uint8_t)value;
+    else ss->phz.selected=(uint8_t)(value-1);
     clear_error(ss);
 }
 static void scoped(uint8_t slot, scene_state_t *ss, exec_state_t *es,
@@ -235,20 +183,26 @@ PHZ_SCOPE(1,0)
 PHZ_SCOPE(2,1)
 PHZ_SCOPE(3,2)
 PHZ_SCOPE(4,3)
-const tele_op_t op_PHZ=MAKE_GET_SET_OP(PHZ,select_get,select_set,0,true);
-const tele_op_t op_PHZ_ADDR=MAKE_GET_SET_OP(PHZ.ADDR,address_get,address_set,0,true);
+#define PHZ_GET_OP(n,g,p,r,d) \
+    { .name=#n, .get=g, .set=NULL, .params=p, .returns=r, \
+      .data=(const void *)(uintptr_t)(d) }
+#define PHZ_GET_SET_OP(n,g,s,p,r,d) \
+    { .name=#n, .get=g, .set=s, .params=p, .returns=r, \
+      .data=(const void *)(uintptr_t)(d) }
+const tele_op_t op_PHZ=PHZ_GET_SET_OP(PHZ,setting_get,setting_set,0,true,0);
+const tele_op_t op_PHZ_ADDR=PHZ_GET_SET_OP(PHZ.ADDR,setting_get,setting_set,0,true,1);
 const tele_op_t op_PHZ_ERR=MAKE_GET_OP(PHZ.ERR,error_get,0,true);
-const tele_op_t op_PHZ_Q_IN=MAKE_GET_OP(PHZ.Q.IN,input,2,false);
-const tele_op_t op_PHZ_Q_POS=MAKE_GET_OP(PHZ.Q.POS,position,2,false);
+const tele_op_t op_PHZ_Q_IN=PHZ_GET_OP(PHZ.Q.IN,signal_write,2,false,1);
+const tele_op_t op_PHZ_Q_POS=PHZ_GET_OP(PHZ.Q.POS,signal_write,2,false,2);
 const tele_op_t op_PHZ_Q_OUT=MAKE_GET_OP(PHZ.Q.OUT,output,1,true);
 const tele_op_t op_PHZ_Q_OK=MAKE_GET_OP(PHZ.Q.OK,output_ok,0,true);
-const tele_op_t op_PHZ_QTZ_SCALE=MAKE_GET_OP(PHZ.QTZ.SCALE,quantizer_scale,2,false);
-const tele_op_t op_PHZ_QTZ_ROOT=MAKE_GET_OP(PHZ.QTZ.ROOT,quantizer_root,2,false);
-const tele_op_t op_PHZ_QTZ_OCT=MAKE_GET_OP(PHZ.QTZ.OCT,quantizer_octave,2,false);
-const tele_op_t op_PHZ_QTZ_MASK=MAKE_GET_OP(PHZ.QTZ.MASK,quantizer_mask,2,false);
-const tele_op_t op_PHZ_QTZ_RANGE=MAKE_GET_OP(PHZ.QTZ.RANGE,quantizer_range,3,false);
-const tele_op_t op_PHZ_QTZ_ROFF=MAKE_GET_OP(PHZ.QTZ.ROFF,quantizer_range_off,1,false);
-const tele_op_t op_PHZ_QTZ_REPL=MAKE_GET_OP(PHZ.QTZ.REPL,quantizer_replace,8,false);
+const tele_op_t op_PHZ_QTZ_SCALE=PHZ_GET_OP(PHZ.QTZ.SCALE,quantizer,2,false,PC_QTZ_SCALE);
+const tele_op_t op_PHZ_QTZ_ROOT=PHZ_GET_OP(PHZ.QTZ.ROOT,quantizer,2,false,PC_QTZ_ROOT);
+const tele_op_t op_PHZ_QTZ_OCT=PHZ_GET_OP(PHZ.QTZ.OCT,quantizer,2,false,PC_QTZ_OCTAVE);
+const tele_op_t op_PHZ_QTZ_MASK=PHZ_GET_OP(PHZ.QTZ.MASK,quantizer,2,false,PC_QTZ_MASK);
+const tele_op_t op_PHZ_QTZ_RANGE=PHZ_GET_OP(PHZ.QTZ.RANGE,quantizer,3,false,PC_QTZ_RANGE);
+const tele_op_t op_PHZ_QTZ_ROFF=PHZ_GET_OP(PHZ.QTZ.ROFF,quantizer,1,false,PC_QTZ_RANGE_OFF);
+const tele_op_t op_PHZ_QTZ_REPL=PHZ_GET_OP(PHZ.QTZ.REPL,quantizer,8,false,PC_QTZ_REPLACE);
 const tele_mod_t mod_PHZ1=MAKE_MOD(PHZ1,scope1,0);
 const tele_mod_t mod_PHZ2=MAKE_MOD(PHZ2,scope2,0);
 const tele_mod_t mod_PHZ3=MAKE_MOD(PHZ3,scope3,0);
