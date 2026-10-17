@@ -167,3 +167,26 @@ void itoa_rbin(uint16_t value, char *out) {
     }
     out[index + 1] = '\0';
 }
+
+void copy_display_text(char *dest, size_t dest_size, const char *source,
+                       size_t source_size) {
+    if (!dest_size) return;
+
+    size_t limit = source_size;
+    if (limit >= dest_size) limit = dest_size - 1;
+
+    size_t i = 0;
+    for (; i < limit && source[i]; i++) {
+        uint8_t c = (uint8_t)source[i];
+        dest[i] = c >= 0x20 && c <= 0x7e ? (char)c : '?';
+    }
+    dest[i] = '\0';
+}
+
+bool bytes_are_value(const void *data, size_t size, uint8_t value) {
+    const uint8_t *bytes = data;
+    for (size_t i = 0; i < size; i++) {
+        if (bytes[i] != value) return false;
+    }
+    return true;
+}

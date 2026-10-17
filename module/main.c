@@ -1221,7 +1221,7 @@ void initialize_module(void) {
     // screen init
     render_init();
 
-    if (is_flash_fresh()) {
+    if (flash_needs_prepare_confirmation()) {
         char s[36];
         strcpy(s, "SCENES WILL BE OVERWRITTEN!");
         region_fill(&line[4], 0);

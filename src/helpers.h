@@ -1,6 +1,8 @@
 #ifndef _HELPERS_H_
 #define _HELPERS_H_
 
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 // http://stackoverflow.com/questions/3599160/unused-parameter-warnings-in-c-code
@@ -20,5 +22,8 @@ int16_t rev_bitstring_to_int(const char *token);
 void itoa_hex(uint16_t value, char *out);
 void itoa_bin(uint16_t value, char *out);
 void itoa_rbin(uint16_t value, char *out);
+void copy_display_text(char *dest, size_t dest_size, const char *source,
+                       size_t source_size);
+bool bytes_are_value(const void *data, size_t size, uint8_t value);
 
 #endif

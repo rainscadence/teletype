@@ -3,6 +3,7 @@
 // this
 #include "flash.h"
 #include "globals.h"
+#include "helpers.h"
 #include "keyboard_helper.h"
 #include "live_mode.h"
 
@@ -88,18 +89,21 @@ uint8_t screen_refresh_preset_r() {
     if (!dirty) { return 0; }
 
     char s[32];
+    char scene_line[SCENE_TEXT_CHARS];
     itoa(preset_select, s, 10);
     region_fill(&line[0], 1);
     font_string_region_clip_right(&line[0], s, 126, 0, 0xf, 1);
-    font_string_region_clip(&line[0], flash_scene_text(preset_select, 0), 2, 0,
-                            0xf, 1);
+    copy_display_text(scene_line, sizeof(scene_line),
+                      flash_scene_text(preset_select, 0), SCENE_TEXT_CHARS);
+    font_string_region_clip(&line[0], scene_line, 2, 0, 0xf, 1);
 
 
     for (uint8_t y = 1; y < 8; y++) {
         region_fill(&line[y], 0);
-        font_string_region_clip(&line[y],
-                                flash_scene_text(preset_select, offset + y), 2,
-                                0, 0xa, 0);
+        copy_display_text(scene_line, sizeof(scene_line),
+                          flash_scene_text(preset_select, offset + y),
+                          SCENE_TEXT_CHARS);
+        font_string_region_clip(&line[y], scene_line, 2, 0, 0xa, 0);
     }
 
     dirty = false;

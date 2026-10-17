@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "greatest/greatest.h"
+#include "helpers.h"
 #include "log.h"
 #include "ops/op_enum.h"
 #include "scene_serialization.h"
@@ -165,6 +166,34 @@ TEST test_deserialize_fragment_script_basic() {
     PASS();
 }
 
+TEST test_copy_display_text_sanitizes_erased_flash() {
+    char erased[SCENE_TEXT_CHARS];
+    char display[SCENE_TEXT_CHARS];
+
+    memset(erased, 0xff, sizeof(erased));
+    memset(display, 0xa5, sizeof(display));
+
+    copy_display_text(display, sizeof(display), erased, sizeof(erased));
+
+    for (size_t i = 0; i < sizeof(display) - 1; i++) {
+        ASSERT_EQ('?', display[i]);
+    }
+    ASSERT_EQ('\0', display[sizeof(display) - 1]);
+
+    PASS();
+}
+
+TEST test_bytes_are_value_detects_erased_flash() {
+    uint8_t erased[16];
+    memset(erased, 0xff, sizeof(erased));
+
+    ASSERT(bytes_are_value(erased, sizeof(erased), 0xff));
+    erased[7] = 0;
+    ASSERT_FALSE(bytes_are_value(erased, sizeof(erased), 0xff));
+
+    PASS();
+}
+
 SUITE(serialize_scene_suite) {
     log_init();
     init_serializers();
@@ -187,5 +216,7 @@ SUITE(serialize_scene_suite) {
     RUN_TESTp(test_round_trip_file, "../presets/tt08.txt",
               "./test_output/tt08.txt");
     RUN_TEST(test_deserialize_fragment_script_basic);
+    RUN_TEST(test_copy_display_text_sanitizes_erased_flash);
+    RUN_TEST(test_bytes_are_value_detects_erased_flash);
     log_print();
 }

@@ -9,6 +9,7 @@
 #include "print_funcs.h"
 
 // this
+#include "helpers.h"
 #include "teletype.h"
 
 #define FIRSTRUN_KEY 0x22
@@ -24,14 +25,22 @@ nvram_data_t f;
 static void pack_grid(scene_state_t *scene);
 static void unpack_grid(scene_state_t *scene);
 
+static u8 flash_is_erased(void) {
+    return bytes_are_value(&f, sizeof(f), 0xff);
+}
+
 u8 is_flash_fresh() {
     return f.fresh != FIRSTRUN_KEY;
+}
+
+u8 flash_needs_prepare_confirmation() {
+    return is_flash_fresh() && !flash_is_erased();
 }
 
 void flash_prepare() {
     // if it's not empty return
     if (f.fresh != FIRSTRUN_KEY) {
-        int confirm = 1;
+        int confirm = flash_is_erased() ? 0 : 1;
         uint32_t counter = 0;
         int toggle = 0;
 #define TIMEOUT 100000

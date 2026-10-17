@@ -33,6 +33,7 @@ typedef struct {
 } nvram_data_t;
 
 u8 is_flash_fresh(void);
+u8 flash_needs_prepare_confirmation(void);
 void flash_prepare(void);
 void flash_read(uint8_t preset_no, scene_state_t *scene,
                 char (*text)[SCENE_TEXT_LINES][SCENE_TEXT_CHARS],
