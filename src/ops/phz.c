@@ -19,7 +19,7 @@
 // Reuse the contiguous PHZ registration ranges instead of expanding the large
 // generated lexer.
 bool phz_match_token(const char *token, size_t length, tele_data_t *out) {
-    for (uint16_t i=E_OP_PHZ; i<=E_OP_PHZ_QTZ_CAP; ++i) {
+    for (uint16_t i=E_OP_PHZ; i<=E_OP_PHZ_I2M_C; ++i) {
         const char *name=tele_ops[i]->name;
         if (!strncmp(token,name,length) && !name[length]) {
             out->tag=OP; out->value=i; return true;
@@ -32,6 +32,36 @@ bool phz_match_token(const char *token, size_t length, tele_data_t *out) {
         return true;
     }
     return false;
+}
+static PHZ_NOINLINE uint16_t next_tag(scene_state_t *ss);
+static PHZ_NOINLINE void record(scene_state_t *ss, pcs_result r);
+static PHZ_NOINLINE void argument_error(scene_state_t *ss);
+static void chord_setting(const void *data, scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    uint8_t op=(uint8_t)(uintptr_t)data;
+    int16_t chord=cs_pop(cs), value=cs_pop(cs);
+    if (chord<0 || chord>8 ||
+        (op==PC_MIDI_CHORD_SCALE ? (value<0 || value>8) :
+         (value<-127 || value>127))) {
+        argument_error(ss); return;
+    }
+    pc_request request={PC_FAMILY_MIDI,op,(uint8_t)chord,next_tag(ss),
+                        (uint16_t)value};
+    record(ss,pcs_command(ss->phz.address[ss->phz.selected],&request));
+}
+static void chord_play(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t chord=cs_pop(cs), root=cs_pop(cs), velocity=cs_pop(cs);
+    uint8_t channel=ss->phz.channel[ss->phz.selected];
+    if (chord<1 || chord>8 || root<0 || root>127 || velocity<0 ||
+        velocity>127 || channel<1 || channel>16) {
+        argument_error(ss); return;
+    }
+    pc_request request={
+        PC_FAMILY_MIDI,PC_MIDI_CHORD_PLAY,
+        (uint8_t)(((channel-1)<<4)|chord),next_tag(ss),
+        (uint16_t)((root<<8)|velocity)};
+    record(ss,pcs_command(ss->phz.address[ss->phz.selected],&request));
 }
 
 static PHZ_NOINLINE uint16_t next_tag(scene_state_t *ss) {
@@ -224,6 +254,12 @@ const tele_op_t op_PHZ_I2M_C_B PHZ_PREVECTOR_DATA=
     PHZ_GET_OP(PHZ.I2M.C.B,signal_write,2,false,0);
 const tele_op_t op_PHZ_QTZ_CAP PHZ_PREVECTOR_DATA=
     PHZ_GET_OP(PHZ.QTZ.CAP,quantizer,2,false,PC_QTZ_CAPTURE_CHORD);
+const tele_op_t op_PHZ_I2M_C_SC PHZ_PREVECTOR_DATA=
+    PHZ_GET_OP(PHZ.I2M.C.SC,chord_setting,2,false,PC_MIDI_CHORD_SCALE);
+const tele_op_t op_PHZ_I2M_C_TRP PHZ_PREVECTOR_DATA=
+    PHZ_GET_OP(PHZ.I2M.C.TRP,chord_setting,2,false,PC_MIDI_CHORD_TRANSPOSE);
+const tele_op_t op_PHZ_I2M_C PHZ_PREVECTOR_DATA=
+    PHZ_GET_OP(PHZ.I2M.C,chord_play,3,false,0);
 const tele_mod_t mod_PHZ1=MAKE_MOD(PHZ1,scope1,0);
 const tele_mod_t mod_PHZ2=MAKE_MOD(PHZ2,scope2,0);
 const tele_mod_t mod_PHZ3=MAKE_MOD(PHZ3,scope3,0);

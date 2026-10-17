@@ -41,8 +41,8 @@ TEST phz_tokens_require_exact_matches() {
     const char *bad[] = {"PH", "PHZ.", "PHZ0", "PHZ5", "PHZ10", "PHZ1X",
         "PHZ.Q", "PHZ.Q.I", "PHZ.Q.INX", "PHZ.Q.IN PHZ", "PHZPHZ", "phz",
         "PHZ.QTZ", "PHZ.QTZ.", "PHZ.QTZ.CAPX", "PHZ.QTZ.REPLACE",
-        "PHZ.QTZ.SCALEX", "PHZ.I2M", "PHZ.I2M.", "PHZ.I2M.C",
-        "PHZ.I2M.C.BX"};
+        "PHZ.QTZ.SCALEX", "PHZ.I2M", "PHZ.I2M.", "PHZ.I2M.CX",
+        "PHZ.I2M.C.BX", "PHZ.I2M.C.SCX", "PHZ.I2M.C.TRPX"};
     tele_data_t data;
     for (size_t i=0; i<sizeof(bad)/sizeof(bad[0]); ++i)
         ASSERT_FALSEm(bad[i], match_token(bad[i],strlen(bad[i]),&data));

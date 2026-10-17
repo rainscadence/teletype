@@ -253,54 +253,49 @@ const tele_op_t op_I2M_TEST            = MAKE_GET_OP(I2M.TEST, op_I2M_TEST_get, 
 static u8 midi_channel = 0, q_channel = 0;
 static u8 d[7];
 
-#define SEND_CMD(cmd) \
-    d[0] = cmd;       \
-    tele_ii_tx(I2C2MIDI, d, 1);
+// Keep the legacy native transport byte-for-byte identical while sharing the
+// framing code. The AVR32 target is bounded by the fixed preset-flash boundary;
+// out-of-line helpers recover the space needed for the PHZ chord slice without
+// removing any native I2C2MIDI operations.
+static __attribute__((noinline)) void send(u8 command, u8 length) {
+    d[0] = command;
+    tele_ii_tx(I2C2MIDI, d, length);
+}
+static __attribute__((noinline)) void send_b1(u8 command, u8 b1) {
+    d[1] = b1; send(command, 2);
+}
+static __attribute__((noinline)) void send_b2(u8 command, u8 b1, u8 b2) {
+    d[1] = b1; d[2] = b2; send(command, 3);
+}
+static __attribute__((noinline)) void send_b3(u8 command, u8 b1, u8 b2,
+                                               u8 b3) {
+    d[1] = b1; d[2] = b2; d[3] = b3; send(command, 4);
+}
+static __attribute__((noinline)) void send_b4(u8 command, u8 b1, u8 b2,
+                                               u8 b3, u8 b4) {
+    d[1] = b1; d[2] = b2; d[3] = b3; d[4] = b4; send(command, 5);
+}
+static __attribute__((noinline)) void send_b5(u8 command, u8 b1, u8 b2,
+                                               u8 b3, u8 b4, u8 b5) {
+    d[1] = b1; d[2] = b2; d[3] = b3; d[4] = b4; d[5] = b5;
+    send(command, 6);
+}
+static __attribute__((noinline)) void send_b6(u8 command, u8 b1, u8 b2,
+                                               u8 b3, u8 b4, u8 b5, u8 b6) {
+    d[1] = b1; d[2] = b2; d[3] = b3; d[4] = b4; d[5] = b5; d[6] = b6;
+    send(command, 7);
+}
 
-#define SEND_B1(cmd, b) \
-    d[0] = cmd;         \
-    d[1] = b;           \
-    tele_ii_tx(I2C2MIDI, d, 2);
-
-#define SEND_B2(cmd, b1, b2) \
-    d[0] = cmd;              \
-    d[1] = b1;               \
-    d[2] = b2;               \
-    tele_ii_tx(I2C2MIDI, d, 3);
-
-#define SEND_B3(cmd, b1, b2, b3) \
-    d[0] = cmd;                  \
-    d[1] = b1;                   \
-    d[2] = b2;                   \
-    d[3] = b3;                   \
-    tele_ii_tx(I2C2MIDI, d, 4);
-
+#define SEND_CMD(cmd) send((cmd), 1)
+#define SEND_B1(cmd, b1) send_b1((cmd), (b1))
+#define SEND_B2(cmd, b1, b2) send_b2((cmd), (b1), (b2))
+#define SEND_B3(cmd, b1, b2, b3) send_b3((cmd), (b1), (b2), (b3))
 #define SEND_B4(cmd, b1, b2, b3, b4) \
-    d[0] = cmd;                      \
-    d[1] = b1;                       \
-    d[2] = b2;                       \
-    d[3] = b3;                       \
-    d[4] = b4;                       \
-    tele_ii_tx(I2C2MIDI, d, 5);
-
+    send_b4((cmd), (b1), (b2), (b3), (b4))
 #define SEND_B5(cmd, b1, b2, b3, b4, b5) \
-    d[0] = cmd;                          \
-    d[1] = b1;                           \
-    d[2] = b2;                           \
-    d[3] = b3;                           \
-    d[4] = b4;                           \
-    d[5] = b5;                           \
-    tele_ii_tx(I2C2MIDI, d, 6);
-
+    send_b5((cmd), (b1), (b2), (b3), (b4), (b5))
 #define SEND_B6(cmd, b1, b2, b3, b4, b5, b6) \
-    d[0] = cmd;                              \
-    d[1] = b1;                               \
-    d[2] = b2;                               \
-    d[3] = b3;                               \
-    d[4] = b4;                               \
-    d[5] = b5;                               \
-    d[6] = b6;                               \
-    tele_ii_tx(I2C2MIDI, d, 7);
+    send_b6((cmd), (b1), (b2), (b3), (b4), (b5), (b6))
 
 #define RECEIVE_AND_PUSH_S8     \
     d[0] = 0;                   \

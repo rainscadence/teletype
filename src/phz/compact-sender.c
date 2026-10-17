@@ -50,6 +50,9 @@ pcs_result pcs_command(uint8_t address, const pc_request *request) {
     request_header(tx,request->family,request->op,request->tag);
     tx[6]=request->mapping; put_word(tx+7,request->value);
     exchange(address,tx,9,request->family,request->op,request->tag,0,&r);
+    if (!r.error && request->family==PC_FAMILY_MIDI &&
+        request->op==PC_MIDI_CHORD_SCALE)
+        exchange(address,tx,9,request->family,request->op,request->tag,0,&r);
     return r;
 }
 PCS_NO_JUMPS pcs_result pcs_quantizer_command(
@@ -120,6 +123,9 @@ pcs_result pcs_command(uint8_t address, const pc_request *request) {
     }
     pcs_result r;
     exchange(address,request,&r);
+    if (request && !r.error && request->family==PC_FAMILY_MIDI &&
+        request->op==PC_MIDI_CHORD_SCALE)
+        exchange(address,request,&r);
     return r;
 }
 static pcs_result quantizer_exchange(uint8_t address,

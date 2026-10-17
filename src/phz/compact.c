@@ -12,10 +12,25 @@ static void raw_header(uint8_t family, uint8_t op, uint16_t tag,
     put_word(b+4,tag);
 }
 static size_t length(const pc_request *r) {
+    int16_t signed_value;
     if (!r || !r->tag) return 0;
     if (!r->family) return r->op == 1 && !r->mapping && !r->value ? 6 : 0;
-    if (r->family == PC_FAMILY_MIDI)
-        return r->op == PC_MIDI_CHORD_BITMAP && r->mapping <= 8 ? 9 : 0;
+    if (r->family == PC_FAMILY_MIDI) {
+        switch (r->op) {
+        case PC_MIDI_CHORD_BITMAP:
+            return r->mapping <= 8 ? 9 : 0;
+        case PC_MIDI_CHORD_SCALE:
+            return r->mapping <= 8 && r->value <= 8 ? 9 : 0;
+        case PC_MIDI_CHORD_TRANSPOSE:
+            signed_value=(int16_t)r->value;
+            return r->mapping <= 8 && signed_value >= -127 &&
+                   signed_value <= 127 ? 9 : 0;
+        case PC_MIDI_CHORD_PLAY:
+            return (r->mapping & 15) >= 1 && (r->mapping & 15) <= 8 &&
+                   (r->value >> 8) <= 127 && (r->value & 255) <= 127 ? 9 : 0;
+        default: return 0;
+        }
+    }
     if (r->family != 1 || r->mapping < 1 || r->mapping > 32) return 0;
     if (r->op == 1 || (r->op == 2 && r->value <= 16384)) return 9;
     return (r->op == 3 || r->op == 4) && !r->value ? 7 : 0;
@@ -140,8 +155,7 @@ int pc_encode(const pc_request *r, uint8_t *b, size_t cap, size_t *written) {
 }
 static int result_valid(const pc_request *r, uint8_t status, uint16_t value) {
     int write=(r->family == 1 && r->op <= 2) ||
-              (r->family == PC_FAMILY_MIDI &&
-               r->op == PC_MIDI_CHORD_BITMAP);
+              r->family == PC_FAMILY_MIDI;
     if (status > PC_UNSUPPORTED) return 0;
     if (status >= PC_ARGUMENT) return value == 0;
     if (write) return status == PC_ADMITTED && value == 0;

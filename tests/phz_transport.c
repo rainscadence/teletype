@@ -41,7 +41,15 @@ int tele_ii_tx_checked(uint8_t address, const uint8_t *data, uint8_t n) {
     uint8_t status=phz_bus.disposition;
     uint16_t value=0;
     if(!status) {
-        if(phz_bus.last.op<=2) status=PC_ADMITTED;
+        if (phz_bus.last.family==PC_FAMILY_MIDI) {
+            if (phz_bus.last.op==PC_MIDI_CHORD_SCALE) {
+                if (!phz_bus.capture_queries++) status=PC_ADMITTED;
+                else if (phz_bus.capture_busy) {
+                    --phz_bus.capture_busy; status=PC_BUSY;
+                } else status=phz_bus.capture_result
+                    ? phz_bus.capture_result : PC_ADMITTED;
+            } else status=PC_ADMITTED;
+        } else if(phz_bus.last.op<=2) status=PC_ADMITTED;
         else if(phz_bus.last.op==3) value=phz_bus.voltage;
     }
     assert(pc_select(&response,data,n,1,status,value,phz_bus.available));

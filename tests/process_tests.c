@@ -691,6 +691,51 @@ TEST test_phz_chord_bitmap() {
     CHECK_CALL(process_helper_state(&ss,2,scoped,PHZ_ERR_DISABLED));
     ASSERT_EQ(phz_bus.calls,0);
     ASSERT_EQ(ss.phz.selected,0);
+
+    phz_bus_reset();
+    char* scale[]={"PHZ.I2M.C.SC 1 2","PHZ.ERR"};
+    CHECK_CALL(process_helper_state(&ss,2,scale,PHZ_ERR_NONE));
+    ASSERT_EQ(phz_bus.last.family,PC_FAMILY_MIDI);
+    ASSERT_EQ(phz_bus.last.op,PC_MIDI_CHORD_SCALE);
+    ASSERT_EQ(phz_bus.last.mapping,1);
+    ASSERT_EQ(phz_bus.last.value,2);
+    ASSERT_EQ(phz_bus.capture_queries,2);
+    ASSERT_EQ(phz_bus.calls,4);
+
+    phz_bus_reset(); phz_bus.capture_result=PC_UNAVAILABLE;
+    CHECK_CALL(process_helper_state(&ss,2,scale,PHZ_ERR_UNAVAILABLE));
+    ASSERT_EQ(phz_bus.calls,4);
+    phz_bus_reset(); phz_bus.capture_busy=1;
+    CHECK_CALL(process_helper_state(&ss,2,scale,PHZ_ERR_BUSY));
+    ASSERT_EQ(phz_bus.calls,4);
+
+    phz_bus_reset();
+    char* transpose[]={"PHZ.I2M.C.TRP 1 -2","PHZ.ERR"};
+    CHECK_CALL(process_helper_state(&ss,2,transpose,PHZ_ERR_NONE));
+    ASSERT_EQ(phz_bus.last.op,PC_MIDI_CHORD_TRANSPOSE);
+    ASSERT_EQ(phz_bus.last.mapping,1);
+    ASSERT_EQ((int16_t)phz_bus.last.value,-2);
+    ASSERT_EQ(phz_bus.calls,2);
+
+    phz_bus_reset();
+    char* play[]={"PHZ.I2M.C 1 60 100","PHZ.ERR"};
+    CHECK_CALL(process_helper_state(&ss,2,play,PHZ_ERR_NONE));
+    ASSERT_EQ(phz_bus.last.op,PC_MIDI_CHORD_PLAY);
+    ASSERT_EQ(phz_bus.last.mapping,1);
+    ASSERT_EQ(phz_bus.last.value,(60<<8)|100);
+    ASSERT_EQ(phz_bus.calls,2);
+
+    const char* invalid_transform[]={
+        "PHZ.I2M.C.SC -1 1","PHZ.I2M.C.SC 1 9",
+        "PHZ.I2M.C.TRP 9 0","PHZ.I2M.C.TRP 1 -128",
+        "PHZ.I2M.C 0 60 100","PHZ.I2M.C 1 128 100",
+        "PHZ.I2M.C 1 60 128"};
+    for (size_t i=0;i<sizeof invalid_transform/sizeof invalid_transform[0];++i) {
+        phz_bus_reset();
+        char* lines[]={(char*)invalid_transform[i],"PHZ.ERR"};
+        CHECK_CALL(process_helper_state(&ss,2,lines,PHZ_ERR_ARGUMENT));
+        ASSERT_EQ(phz_bus.calls,0);
+    }
     PASS();
 }
 
