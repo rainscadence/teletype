@@ -21,7 +21,8 @@ enum { PC_QTZ_SCALE = 1, PC_QTZ_ROOT, PC_QTZ_OCTAVE, PC_QTZ_MASK,
        PC_QTZ_RANGE, PC_QTZ_RANGE_OFF, PC_QTZ_REPLACE,
        PC_QTZ_CAPTURE_CHORD };
 typedef struct {
-    uint8_t op, slot, root, range_enabled, source_chord;
+    /* CAPTURE_CHORD reuses root as its one-byte source chord operand. */
+    uint8_t op, slot, root, range_enabled;
     uint16_t tag, scale, mask;
     int8_t octave, low, high;
 } pc_qtz_request;

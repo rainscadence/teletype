@@ -25,6 +25,7 @@ static void exchange(uint8_t address, const uint8_t *tx, uint8_t length,
                      uint8_t reply_kind, pcs_result *r) {
     uint8_t rx[9];
     uint16_t value;
+again:
     result_clear(r);
     if (!address) { r->error=PCS_DISABLED; return; }
     if (address<8 || address>0x77) { r->error=PCS_ARGUMENT; return; }
@@ -36,12 +37,13 @@ static void exchange(uint8_t address, const uint8_t *tx, uint8_t length,
     if (rx[0]!=0x52 || rx[1]!=1 || rx[2]!=family || rx[3]!=op ||
         word(rx+4)!=tag || rx[6]>PC_UNSUPPORTED ||
         (rx[6]>=PC_ARGUMENT ? value!=0 :
-         (reply_kind==0 ? (rx[6]!=PC_ADMITTED || value!=0) :
-          (rx[6]!=PC_READ || (reply_kind==2 && value>1))))) {
+         (!(reply_kind & 1) ? (rx[6]!=PC_ADMITTED || value!=0) :
+          (rx[6]!=PC_READ || (reply_kind==3 && value>1))))) {
         r->error=PCS_PROTOCOL; return;
     }
     r->remote_status=rx[6]; r->data=value; r->remote_known=1;
     if (r->remote_status>=PC_ARGUMENT) r->error=PCS_REMOTE;
+    if (reply_kind==2 && !r->error) { reply_kind=0; goto again; }
 }
 pcs_result pcs_command(uint8_t address, const pc_request *request) {
     pcs_result r; uint8_t tx[9];
@@ -59,6 +61,7 @@ PCS_NO_JUMPS pcs_result pcs_quantizer_command(
     case PC_QTZ_SCALE:
         put_word(tx+7,request->scale); break;
     case PC_QTZ_ROOT:
+    case PC_QTZ_CAPTURE_CHORD:
         tx[7]=request->root; tx[8]=0; break;
     case PC_QTZ_OCTAVE:
         tx[7]=(uint8_t)request->octave; tx[8]=0; break;
@@ -75,7 +78,8 @@ PCS_NO_JUMPS pcs_result pcs_quantizer_command(
         tx[15]=(uint8_t)request->high; break;
     default: break;
     }
-    exchange(address,tx,length,PC_FAMILY_QUANTIZER,request->op,request->tag,0,&r);
+    exchange(address,tx,length,PC_FAMILY_QUANTIZER,request->op,
+             request->tag,request->op==PC_QTZ_CAPTURE_CHORD ? 2 : 0,&r);
     return r;
 }
 void pcs_output(uint8_t address, uint8_t mapping, uint16_t tag, pcs_sample *out) {
@@ -85,7 +89,7 @@ void pcs_output(uint8_t address, uint8_t mapping, uint16_t tag, pcs_sample *out)
     exchange(address,tx,7,1,3,tag,1,&out->result);
     if (out->result.error) return;
     voltage=out->result.data; out->result.data=0; tx[3]=4;
-    exchange(address,tx,7,1,4,tag,2,&out->result);
+    exchange(address,tx,7,1,4,tag,3,&out->result);
     if (out->result.error) return;
     if (out->result.data!=1) { out->result.error=PCS_UNAVAILABLE; return; }
     out->voltage=voltage<=32767 ? (int32_t)voltage : (int32_t)voltage-65536;
@@ -118,8 +122,8 @@ pcs_result pcs_command(uint8_t address, const pc_request *request) {
     exchange(address,request,&r);
     return r;
 }
-pcs_result pcs_quantizer_command(uint8_t address,
-                                 const pc_qtz_request *request) {
+static pcs_result quantizer_exchange(uint8_t address,
+                                     const pc_qtz_request *request) {
     pcs_result r;
     uint8_t tx[16], rx[9]={0};
     size_t n=0;
@@ -138,6 +142,14 @@ pcs_result pcs_quantizer_command(uint8_t address,
     }
     r.remote_known=1;
     if (r.remote_status>=PC_ARGUMENT) r.error=PCS_REMOTE;
+    return r;
+}
+pcs_result pcs_quantizer_command(uint8_t address,
+                                 const pc_qtz_request *request) {
+    pcs_result r=quantizer_exchange(address,request);
+    if (request && request->op==PC_QTZ_CAPTURE_CHORD && !r.error) {
+      r=quantizer_exchange(address,request);
+    }
     return r;
 }
 void pcs_output(uint8_t address, uint8_t mapping, uint16_t tag, pcs_sample *out) {

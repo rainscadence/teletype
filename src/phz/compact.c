@@ -52,7 +52,7 @@ static size_t qtz_length(const pc_qtz_request *r) {
                              : (r->low != 1 || r->high != 0)) return 0;
         return 16;
     case PC_QTZ_CAPTURE_CHORD:
-        return r->source_chord >= 1 && r->source_chord <= 8 ? 9 : 0;
+        return r->root >= 1 && r->root <= 8 ? 9 : 0;
     default: return 0;
     }
 }
@@ -87,7 +87,7 @@ int pc_qtz_decode(const uint8_t *b, size_t n, pc_qtz_request *out) {
         r.low=(int8_t)b[14]; r.high=(int8_t)b[15]; break;
     case PC_QTZ_CAPTURE_CHORD:
         if (n != 9 || b[8] != 0) return 0;
-        r.source_chord=b[7]; break;
+        r.root=b[7]; break;
     default: return 0;
     }
     if (qtz_length(&r) != n) return 0;
@@ -113,7 +113,7 @@ int pc_qtz_encode(const pc_qtz_request *r, uint8_t *b, size_t cap,
         scratch[10]=(uint8_t)r->octave; put_word(scratch+11,r->mask);
         scratch[13]=r->range_enabled; scratch[14]=(uint8_t)r->low;
         scratch[15]=(uint8_t)r->high; break;
-    case PC_QTZ_CAPTURE_CHORD: scratch[7]=r->source_chord; break;
+    case PC_QTZ_CAPTURE_CHORD: scratch[7]=r->root; break;
     default: return 0;
     }
     memcpy(b,scratch,n); *written=n; return 1;

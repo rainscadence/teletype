@@ -629,6 +629,34 @@ TEST test_phz_quantizer() {
     CHECK_CALL(process_helper_state(&ss,2,scoped,PHZ_ERR_DISABLED));
     ASSERT_EQ(phz_bus.calls,0);
     ASSERT_EQ(ss.phz.selected,0);
+
+    phz_bus_reset();
+    char* capture[]={"PHZ.QTZ.CAP 3 1","PHZ.ERR"};
+    CHECK_CALL(process_helper_state(&ss,2,capture,PHZ_ERR_NONE));
+    ASSERT_EQ(phz_bus.last_qtz.op,PC_QTZ_CAPTURE_CHORD);
+    ASSERT_EQ(phz_bus.last_qtz.slot,3);
+    ASSERT_EQ(phz_bus.last_qtz.root,1);
+    ASSERT_EQ(phz_bus.capture_queries,2);
+    ASSERT_EQ(phz_bus.calls,4);
+
+    phz_bus_reset(); phz_bus.capture_result=PC_UNAVAILABLE;
+    CHECK_CALL(process_helper_state(&ss,2,capture,PHZ_ERR_UNAVAILABLE));
+    ASSERT_EQ(phz_bus.calls,4);
+
+    phz_bus_reset(); phz_bus.capture_busy=1;
+    CHECK_CALL(process_helper_state(&ss,2,capture,PHZ_ERR_BUSY));
+    ASSERT_EQ(phz_bus.calls,4);
+
+    const char* invalid_capture[]={"PHZ.QTZ.CAP 0 1",
+                                   "PHZ.QTZ.CAP 1 0",
+                                   "PHZ.QTZ.CAP 9 1",
+                                   "PHZ.QTZ.CAP 1 9"};
+    for (size_t i=0;i<sizeof invalid_capture/sizeof invalid_capture[0];++i) {
+        phz_bus_reset();
+        char* lines[]={(char*)invalid_capture[i],"PHZ.ERR"};
+        CHECK_CALL(process_helper_state(&ss,2,lines,PHZ_ERR_ARGUMENT));
+        ASSERT_EQ(phz_bus.calls,0);
+    }
     PASS();
 }
 

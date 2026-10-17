@@ -979,6 +979,7 @@ typedef enum {
     E_OP_PHZ_QTZ_ROFF,
     E_OP_PHZ_QTZ_REPL,
     E_OP_PHZ_I2M_C_B,
+    E_OP_PHZ_QTZ_CAP,
     E_OP__LENGTH,
 } tele_op_idx_t;
 

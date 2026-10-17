@@ -22,8 +22,17 @@ int tele_ii_tx_checked(uint8_t address, const uint8_t *data, uint8_t n) {
         phz_bus.is_quantizer=1;
         memcpy(quantizer_response,data,6);
         quantizer_response[0]=0x52;
-        quantizer_response[6]=phz_bus.disposition ? phz_bus.disposition
-                                                 : PC_ADMITTED;
+        if (phz_bus.last_qtz.op==PC_QTZ_CAPTURE_CHORD) {
+            if (!phz_bus.capture_queries++)
+                quantizer_response[6]=PC_ADMITTED;
+            else if (phz_bus.capture_busy) {
+                --phz_bus.capture_busy; quantizer_response[6]=PC_BUSY;
+            } else
+                quantizer_response[6]=phz_bus.capture_result
+                    ? phz_bus.capture_result : PC_ADMITTED;
+        } else
+            quantizer_response[6]=phz_bus.disposition ? phz_bus.disposition
+                                                     : PC_ADMITTED;
         quantizer_response[7]=quantizer_response[8]=0;
         quantizer_pending=1;
         return 0;

@@ -9,6 +9,7 @@ typedef struct {
     pc_request last;
     pc_qtz_request last_qtz;
     uint8_t last_length, is_quantizer;
+    uint8_t capture_result, capture_busy, capture_queries;
 } phz_test_bus;
 extern phz_test_bus phz_bus;
 void phz_bus_reset(void);

@@ -19,17 +19,17 @@
 // Reuse the contiguous PHZ registration ranges instead of expanding the large
 // generated lexer.
 bool phz_match_token(const char *token, size_t length, tele_data_t *out) {
-    for (uint16_t i=E_OP_PHZ; i<=E_OP_PHZ_I2M_C_B; ++i) {
+    for (uint16_t i=E_OP_PHZ; i<=E_OP_PHZ_QTZ_CAP; ++i) {
         const char *name=tele_ops[i]->name;
-        if (strlen(name)==length && !memcmp(token,name,length)) {
+        if (!strncmp(token,name,length) && !name[length]) {
             out->tag=OP; out->value=i; return true;
         }
     }
-    for (uint16_t i=E_MOD_PHZ1; i<=E_MOD_PHZ4; ++i) {
-        const char *name=tele_mods[i]->name;
-        if (strlen(name)==length && !memcmp(token,name,length)) {
-            out->tag=MOD; out->value=i; return true;
-        }
+    if (length==4 && !memcmp(token,"PHZ",3) &&
+        token[3]>='1' && token[3]<='4') {
+        out->tag=MOD;
+        out->value=(int16_t)(E_MOD_PHZ1+token[3]-'1');
+        return true;
     }
     return false;
 }
@@ -56,10 +56,8 @@ static void error_get(const void *NOTUSED(data), scene_state_t *ss,
     int16_t error=ss->phz.error;
     if (error==PCS_REMOTE) {
         uint8_t status=ss->phz.remote_status;
-        error=PHZ_ERR_PROTOCOL;
-        if (ss->phz.remote_known && status>=PC_ARGUMENT &&
-            status<=PC_UNSUPPORTED)
-            error=status==PC_ARGUMENT ? PHZ_ERR_ARGUMENT : status+3;
+        /* PCS_REMOTE is only created after a validated, known error reply. */
+        error=status==PC_ARGUMENT ? PHZ_ERR_ARGUMENT : status+3;
     }
     // Non-destructive and bus-free; selector restoration preserves the error.
     cs_push(cs,error);
@@ -95,8 +93,8 @@ static PHZ_NO_JUMPS void quantizer(const void *data, scene_state_t *ss,
                                    command_state_t *cs) {
     uint8_t op=(uint8_t)(uintptr_t)data;
     int16_t slot=cs_pop(cs), value[7];
-    uint8_t count=op<=PC_QTZ_MASK ? 1 : op==PC_QTZ_RANGE ? 2 :
-                  op==PC_QTZ_REPLACE ? 7 : 0;
+    uint8_t count=op==PC_QTZ_RANGE_OFF ? 0 :
+                  op==PC_QTZ_RANGE ? 2 : op==PC_QTZ_REPLACE ? 7 : 1;
     pc_qtz_request request;
     for (uint8_t i=0; i<count; ++i) value[i]=cs_pop(cs);
     request.op=op;
@@ -139,6 +137,8 @@ static PHZ_NO_JUMPS void quantizer(const void *data, scene_state_t *ss,
         request.range_enabled=(uint8_t)enabled;
         request.low=(int8_t)low; request.high=(int8_t)high; break;
     }
+    case PC_QTZ_CAPTURE_CHORD:
+        request.root=(uint8_t)value[0]; break;
     default: argument_error(ss); return;
     }
     quantizer_send(ss,&request);
@@ -222,7 +222,9 @@ const tele_op_t op_PHZ_QTZ_ROFF=PHZ_GET_OP(PHZ.QTZ.ROFF,quantizer,1,false,PC_QTZ
 const tele_op_t op_PHZ_QTZ_REPL=PHZ_GET_OP(PHZ.QTZ.REPL,quantizer,8,false,PC_QTZ_REPLACE);
 const tele_op_t op_PHZ_I2M_C_B PHZ_PREVECTOR_DATA=
     PHZ_GET_OP(PHZ.I2M.C.B,signal_write,2,false,0);
+const tele_op_t op_PHZ_QTZ_CAP PHZ_PREVECTOR_DATA=
+    PHZ_GET_OP(PHZ.QTZ.CAP,quantizer,2,false,PC_QTZ_CAPTURE_CHORD);
 const tele_mod_t mod_PHZ1=MAKE_MOD(PHZ1,scope1,0);
 const tele_mod_t mod_PHZ2=MAKE_MOD(PHZ2,scope2,0);
 const tele_mod_t mod_PHZ3=MAKE_MOD(PHZ3,scope3,0);
-const tele_mod_t mod_PHZ4=MAKE_MOD(PHZ4,scope4,0);
+const tele_mod_t mod_PHZ4 PHZ_PREVECTOR_DATA=MAKE_MOD(PHZ4,scope4,0);

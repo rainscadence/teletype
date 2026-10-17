@@ -22,6 +22,7 @@ extern const tele_op_t op_PHZ_Q_IN, op_PHZ_Q_POS, op_PHZ_Q_OUT, op_PHZ_Q_OK;
 extern const tele_op_t op_PHZ_QTZ_SCALE, op_PHZ_QTZ_ROOT, op_PHZ_QTZ_OCT;
 extern const tele_op_t op_PHZ_QTZ_MASK, op_PHZ_QTZ_RANGE, op_PHZ_QTZ_ROFF;
 extern const tele_op_t op_PHZ_QTZ_REPL;
+extern const tele_op_t op_PHZ_QTZ_CAP;
 extern const tele_op_t op_PHZ_I2M_C_B;
 extern const tele_mod_t mod_PHZ1, mod_PHZ2, mod_PHZ3, mod_PHZ4;
 #endif
