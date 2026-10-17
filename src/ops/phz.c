@@ -6,15 +6,20 @@
 #if defined(__AVR32__)
 #define PHZ_NOINLINE __attribute__((noinline))
 #define PHZ_NO_JUMPS __attribute__((optimize("no-jump-tables")))
+// Keep this one immutable descriptor in the measured pre-vector flash gap.
+// The AVR32 has unified flash addressing; this avoids spending scarce bytes
+// after the fixed exception-vector alignment without moving the NVRAM boundary.
+#define PHZ_PREVECTOR_DATA __attribute__((section(".text.phz_prevector")))
 #else
 #define PHZ_NOINLINE
 #define PHZ_NO_JUMPS
+#define PHZ_PREVECTOR_DATA
 #endif
 
 // Reuse the contiguous PHZ registration ranges instead of expanding the large
 // generated lexer.
 bool phz_match_token(const char *token, size_t length, tele_data_t *out) {
-    for (uint16_t i=E_OP_PHZ; i<=E_OP_PHZ_QTZ_REPL; ++i) {
+    for (uint16_t i=E_OP_PHZ; i<=E_OP_PHZ_I2M_C_B; ++i) {
         const char *name=tele_ops[i]->name;
         if (strlen(name)==length && !memcmp(token,name,length)) {
             out->tag=OP; out->value=i; return true;
@@ -62,16 +67,28 @@ static void error_get(const void *NOTUSED(data), scene_state_t *ss,
 static void signal_write(const void *data, scene_state_t *ss,
                          exec_state_t *NOTUSED(es), command_state_t *cs) {
     uint8_t op=(uint8_t)(uintptr_t)data;
+    uint8_t family=PC_FAMILY_MIDI;
     int16_t mapping=cs_pop(cs), value=cs_pop(cs);
-    if (mapping<1 || mapping>32 || (op==2 && (value<0 || value>16384))) {
-        argument_error(ss); return;
+    if (op) {
+        family=PC_FAMILY_QUADRANTS;
+        if (mapping<1 || mapping>32 ||
+            (op==2 && (value<0 || value>16384))) goto invalid;
+    } else {
+        op=PC_MIDI_CHORD_BITMAP;
+        if (mapping<0 || mapping>8) goto invalid;
     }
-    pc_request r={1,op,(uint8_t)mapping,next_tag(ss),(uint16_t)value};
+    pc_request r={family,op,(uint8_t)mapping,next_tag(ss),(uint16_t)value};
     record(ss,pcs_command(ss->phz.address[ss->phz.selected],&r));
+    return;
+invalid:
+    argument_error(ss);
 }
 static void quantizer_send(scene_state_t *ss, pc_qtz_request *request) {
     request->tag=next_tag(ss);
     record(ss,pcs_quantizer_command(ss->phz.address[ss->phz.selected],request));
+}
+static PHZ_NOINLINE bool quantizer_range(int16_t low, int16_t high) {
+    return (uint16_t)(low+8)<=16 && (uint16_t)(high+8)<=16 && low<=high;
 }
 static PHZ_NO_JUMPS void quantizer(const void *data, scene_state_t *ss,
                                    exec_state_t *NOTUSED(es),
@@ -100,7 +117,7 @@ static PHZ_NO_JUMPS void quantizer(const void *data, scene_state_t *ss,
         request.mask=(uint16_t)value[0]; break;
     case PC_QTZ_RANGE: {
         int16_t low=value[0], high=value[1];
-        if (low<-8 || low>8 || high<-8 || high>8 || low>high) {
+        if (!quantizer_range(low,high)) {
             argument_error(ss); return;
         }
         request.low=(int8_t)low; request.high=(int8_t)high; break;
@@ -113,7 +130,7 @@ static PHZ_NO_JUMPS void quantizer(const void *data, scene_state_t *ss,
         int16_t high=value[6];
         if (scale<0 || root<0 || root>11 || octave<-8 || octave>8 ||
             !mask || enabled<0 || enabled>1 ||
-            (enabled ? (low<-8 || low>8 || high<-8 || high>8 || low>high)
+            (enabled ? !quantizer_range(low,high)
                      : (low!=1 || high!=0))) {
             argument_error(ss); return;
         }
@@ -203,6 +220,8 @@ const tele_op_t op_PHZ_QTZ_MASK=PHZ_GET_OP(PHZ.QTZ.MASK,quantizer,2,false,PC_QTZ
 const tele_op_t op_PHZ_QTZ_RANGE=PHZ_GET_OP(PHZ.QTZ.RANGE,quantizer,3,false,PC_QTZ_RANGE);
 const tele_op_t op_PHZ_QTZ_ROFF=PHZ_GET_OP(PHZ.QTZ.ROFF,quantizer,1,false,PC_QTZ_RANGE_OFF);
 const tele_op_t op_PHZ_QTZ_REPL=PHZ_GET_OP(PHZ.QTZ.REPL,quantizer,8,false,PC_QTZ_REPLACE);
+const tele_op_t op_PHZ_I2M_C_B PHZ_PREVECTOR_DATA=
+    PHZ_GET_OP(PHZ.I2M.C.B,signal_write,2,false,0);
 const tele_mod_t mod_PHZ1=MAKE_MOD(PHZ1,scope1,0);
 const tele_mod_t mod_PHZ2=MAKE_MOD(PHZ2,scope2,0);
 const tele_mod_t mod_PHZ3=MAKE_MOD(PHZ3,scope3,0);

@@ -327,7 +327,7 @@ const tele_op_t *tele_ops[E_OP__LENGTH] = {
     &op_PHZ_ERR,
     &op_PHZ_QTZ_SCALE, &op_PHZ_QTZ_ROOT, &op_PHZ_QTZ_OCT,
     &op_PHZ_QTZ_MASK, &op_PHZ_QTZ_RANGE, &op_PHZ_QTZ_ROFF,
-    &op_PHZ_QTZ_REPL
+    &op_PHZ_QTZ_REPL, &op_PHZ_I2M_C_B
 };
 
 /////////////////////////////////////////////////////////////////

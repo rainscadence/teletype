@@ -14,6 +14,8 @@ static void raw_header(uint8_t family, uint8_t op, uint16_t tag,
 static size_t length(const pc_request *r) {
     if (!r || !r->tag) return 0;
     if (!r->family) return r->op == 1 && !r->mapping && !r->value ? 6 : 0;
+    if (r->family == PC_FAMILY_MIDI)
+        return r->op == PC_MIDI_CHORD_BITMAP && r->mapping <= 8 ? 9 : 0;
     if (r->family != 1 || r->mapping < 1 || r->mapping > 32) return 0;
     if (r->op == 1 || (r->op == 2 && r->value <= 16384)) return 9;
     return (r->op == 3 || r->op == 4) && !r->value ? 7 : 0;
@@ -137,7 +139,9 @@ int pc_encode(const pc_request *r, uint8_t *b, size_t cap, size_t *written) {
     memcpy(b,scratch,n); *written=n; return 1;
 }
 static int result_valid(const pc_request *r, uint8_t status, uint16_t value) {
-    int write=r->family == 1 && r->op <= 2;
+    int write=(r->family == 1 && r->op <= 2) ||
+              (r->family == PC_FAMILY_MIDI &&
+               r->op == PC_MIDI_CHORD_BITMAP);
     if (status > PC_UNSUPPORTED) return 0;
     if (status >= PC_ARGUMENT) return value == 0;
     if (write) return status == PC_ADMITTED && value == 0;

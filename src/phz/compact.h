@@ -7,6 +7,7 @@ enum { PC_READ, PC_ADMITTED, PC_ARGUMENT, PC_WRONG_APP, PC_UNAVAILABLE,
        PC_BUSY, PC_FULL, PC_UNSUPPORTED };
 enum { PC_FAMILY_COMMON, PC_FAMILY_QUADRANTS, PC_FAMILY_MIDI,
        PC_FAMILY_TXO, PC_FAMILY_TXI, PC_FAMILY_QUANTIZER };
+enum { PC_MIDI_CHORD_BITMAP = 1 };
 typedef struct {
     uint8_t family, op, mapping;
     uint16_t tag, value;

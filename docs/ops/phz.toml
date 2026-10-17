@@ -69,3 +69,14 @@ description = """
 high=0`. The whole replacement is one ordered request; invalid input changes
 nothing.
 """
+
+["PHZ.I2M.C.B"]
+prototype = "PHZ.I2M.C.B chord bitmap"
+short = "Define I2C2MIDI chord 1..8 by reverse-binary note bitmap; 0 selects all"
+description = """
+Bits 0–15 select notes and are stored in descending order, matching I2M.C.B.
+More than eight selected notes retain the highest eight. Chord 0 applies the
+same definition to all eight chords. Bitmap 0 clears the selected chord or
+chords. The request edits the active TXI2C2MIDI setup and is persisted only by
+an explicit front-panel Save.
+"""

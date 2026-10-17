@@ -632,7 +632,42 @@ TEST test_phz_quantizer() {
     PASS();
 }
 
+TEST test_phz_chord_bitmap() {
+    scene_state_t ss; ss_init(&ss); phz_bus_reset();
+    char* define[]={"PHZ.I2M.C.B 1 401","PHZ.ERR"};
+    CHECK_CALL(process_helper_state(&ss,2,define,PHZ_ERR_NONE));
+    ASSERT_EQ(phz_bus.last.family,PC_FAMILY_MIDI);
+    ASSERT_EQ(phz_bus.last.op,PC_MIDI_CHORD_BITMAP);
+    ASSERT_EQ(phz_bus.last.mapping,1);
+    ASSERT_EQ(phz_bus.last.value,0x0191);
+    ASSERT_EQ(phz_bus.last_length,9);
+
+    phz_bus_reset();
+    char* clear_all[]={"PHZ.I2M.C.B 0 0","PHZ.ERR"};
+    CHECK_CALL(process_helper_state(&ss,2,clear_all,PHZ_ERR_NONE));
+    ASSERT_EQ(phz_bus.last.mapping,0);
+    ASSERT_EQ(phz_bus.last.value,0);
+
+    const char* invalid[]={"PHZ.I2M.C.B -1 1","PHZ.I2M.C.B 9 1"};
+    for (size_t i=0;i<sizeof invalid/sizeof invalid[0];++i) {
+        unsigned calls=phz_bus.calls;
+        char* lines[]={(char*)invalid[i],"PHZ.ERR"};
+        CHECK_CALL(process_helper_state(&ss,2,lines,PHZ_ERR_ARGUMENT));
+        ASSERT_EQ(phz_bus.calls,calls);
+    }
+
+    phz_bus_reset(); phz_bus.disposition=PC_FULL;
+    CHECK_CALL(process_helper_state(&ss,2,define,PHZ_ERR_QUEUE_FULL));
+    phz_bus_reset();
+    char* scoped[]={"PHZ4: PHZ.I2M.C.B 1 1","PHZ.ERR"};
+    CHECK_CALL(process_helper_state(&ss,2,scoped,PHZ_ERR_DISABLED));
+    ASSERT_EQ(phz_bus.calls,0);
+    ASSERT_EQ(ss.phz.selected,0);
+    PASS();
+}
+
 SUITE(process_suite) {
+    RUN_TEST(test_phz_chord_bitmap);
     RUN_TEST(test_phz_quantizer);
     RUN_TEST(test_phz_errors);
     RUN_TEST(test_phz_signals);

@@ -12,3 +12,7 @@ was admitted or rejected; admission is not a later application-completion query.
 
 `PHZ.QTZ.CAP` is intentionally not exposed yet. Chord capture needs a correlated
 completion result so an empty or unavailable source chord cannot look successful.
+
+`PHZ.I2M.C.B` defines the prerequisite eight-chord source bank through the
+selected normal-mode PHZ address. It follows native `I2M.C.B` bitmap ordering,
+but does not switch to the fixed legacy I2C2MIDI address.
